@@ -6,12 +6,14 @@ import (
 
 type MeteredWriter struct {
 	io.Writer
-	BytesWritten int
+	n    int64
+	nops int
 }
 
 type MeteredReader struct {
 	io.Reader
-	BytesRead int
+	n    int64
+	nops int
 }
 
 type MeteredReaderWriter struct {
@@ -19,34 +21,40 @@ type MeteredReaderWriter struct {
 	MeteredReader
 }
 
-func (m MeteredReader) Read(buffer []byte) (int, error) {
-	bytesRead, err := m.Reader.Read(buffer)
-	m.BytesRead += bytesRead
-
-	return bytesRead, err
+func (m MeteredReader) Read(buffer []byte) (bytesRead int, err error) {
+	bytesRead, err = m.Reader.Read(buffer)
+	m.n += int64(bytesRead)
+	m.nops += 1
+	return
 }
 
-func (m MeteredReader) ReadCount() int {
-	return m.BytesRead
+func (m MeteredReader) ReadCount() (n int64, nops int) {
+	n = m.n
+	nops = m.nops
+	return
 }
 
-func (m MeteredWriter) Write(buffer []byte) (int, error) {
-	bytesWritten, err := m.Writer.Write(buffer)
-	return bytesWritten, err
+func (m MeteredWriter) Write(buffer []byte) (bytesWritten int, err error) {
+	bytesWritten, err = m.Writer.Write(buffer)
+	m.n += int64(bytesWritten)
+	m.nops += 1
+	return
 }
 
-func (m MeteredWriter) WriteCount() int {
-	return m.BytesWritten
+func (m MeteredWriter) WriteCount() (n int64, nops int) {
+	n = m.n
+	nops = m.nops
+	return
 }
 
 func NewReadCounter(r io.Reader) ReadCounter {
-	return MeteredReader(r)
+	return MeteredReader{Reader: r}
 }
 
 func NewWriteCounter(w io.Writer) WriteCounter {
-	return MeteredWriter{Writer: w, BytesWritten: 0}
+	return MeteredWriter{Writer: w}
 }
 
-func NewReadWriteCounter(rw io.ReaderWriter) ReadWriteCounter{
-	return MeteredReaderWriter{Reader: rw, Writer: rw, BytesRead: 0, BytesWritten: 0}
+func NewReadWriteCounter(rw io.ReadWriter) ReadWriteCounter {
+	return MeteredReaderWriter{MeteredReader: MeteredReader{Reader: rw}, MeteredWriter: MeteredWriter{Writer: rw}}
 }
